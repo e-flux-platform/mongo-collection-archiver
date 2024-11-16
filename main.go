@@ -118,5 +118,5 @@ func run(ctx context.Context, cfg config) error {
 	)
 
 	archiver := archive.NewArchiver(docSource, store, !cfg.delete, cfg.delay)
-	return archiver.Run(ctx, time.Now())
+	return archiver.Run(ctx, targetDate)
 }
