@@ -110,8 +110,9 @@ func TestMongoDB(t *testing.T) {
 		_, err := collection.InsertMany(ctx, []any{doc1, doc2, doc3, doc4})
 		require.NoError(t, err)
 
-		err = source.NewMongoDB(collection).DeleteAllFromDate(ctx, date)
+		total, err := source.NewMongoDB(collection).DeleteAllFromDate(ctx, date)
 		require.NoError(t, err)
+		assert.Equal(t, 2, total) // doc2 and doc3
 
 		cursor, err := collection.Find(ctx, bson.M{})
 		require.NoError(t, err)

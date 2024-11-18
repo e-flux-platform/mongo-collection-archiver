@@ -136,9 +136,10 @@ func (m *mockDocumentSource) FindAllFromDate(_ context.Context, date time.Time) 
 	}
 }
 
-func (m *mockDocumentSource) DeleteAllFromDate(_ context.Context, date time.Time) error {
+func (m *mockDocumentSource) DeleteAllFromDate(_ context.Context, date time.Time) (int, error) {
+	total := len(m.docs[date])
 	delete(m.docs, date)
-	return nil
+	return total, nil
 }
 
 func (m *mockDocumentSource) EarliestCreatedAt(_ context.Context) (time.Time, error) {

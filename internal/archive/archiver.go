@@ -24,7 +24,7 @@ type Archiver struct {
 
 type documentSource interface {
 	FindAllFromDate(ctx context.Context, date time.Time) source.StreamingResult
-	DeleteAllFromDate(ctx context.Context, date time.Time) error
+	DeleteAllFromDate(ctx context.Context, date time.Time) (int, error)
 	EarliestCreatedAt(ctx context.Context) (time.Time, error)
 }
 
@@ -61,14 +61,10 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 	for date := earliest.Truncate(time.Hour * 24); date.Before(target); date = date.AddDate(0, 0, 1) {
 		slog.Info("archiving", slog.String("date", date.String()))
 
-		if err = a.archiveDocuments(ctx, date); err != nil {
-			return fmt.Errorf("failed to archive documents: %w", err)
+		if err = a.archiveDocumentsAndDelete(ctx, date); err != nil {
+			return fmt.Errorf("archival failed: %w", err)
 		}
-		if !a.skipDelete {
-			if err = a.source.DeleteAllFromDate(ctx, date); err != nil {
-				return fmt.Errorf("failed to delete documents: %w", err)
-			}
-		}
+
 		total++
 
 		select {
@@ -80,6 +76,20 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 
 	slog.Info("target reached", slog.Int("datesArchived", total))
 
+	return nil
+}
+
+func (a *Archiver) archiveDocumentsAndDelete(ctx context.Context, date time.Time) error {
+	if err := a.archiveDocuments(ctx, date); err != nil {
+		return fmt.Errorf("failed to archive documents: %w", err)
+	}
+	if !a.skipDelete {
+		deleted, err := a.source.DeleteAllFromDate(ctx, date)
+		if err != nil {
+			return fmt.Errorf("failed to delete documents: %w", err)
+		}
+		slog.Info("documents deleted", slog.Int("total", deleted))
+	}
 	return nil
 }
 

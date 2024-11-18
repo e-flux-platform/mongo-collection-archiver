@@ -65,10 +65,10 @@ func (a *MongoDB) EarliestCreatedAt(ctx context.Context) (time.Time, error) {
 }
 
 // DeleteAllFromDate removes all documents with a createdAt on the supplied date
-func (a *MongoDB) DeleteAllFromDate(ctx context.Context, date time.Time) error {
+func (a *MongoDB) DeleteAllFromDate(ctx context.Context, date time.Time) (int, error) {
 	t := date.Truncate(time.Hour * 24)
 
-	_, err := a.collection.DeleteMany(
+	res, err := a.collection.DeleteMany(
 		ctx,
 		bson.M{
 			"createdAt": bson.M{
@@ -77,7 +77,11 @@ func (a *MongoDB) DeleteAllFromDate(ctx context.Context, date time.Time) error {
 			},
 		},
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+
+	return int(res.DeletedCount), nil
 }
 
 type StreamingResult interface {
