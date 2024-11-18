@@ -89,6 +89,11 @@ func TestArchiver_Integration(t *testing.T) {
 	require.NoError(t, err)
 	ids = readMongoIDs(t, ctx, collection)
 	require.Len(t, ids, 4)
+
+	// Verify earliest is resolved to the createdAt time of doc1
+	earliest, err := src.EarliestCreatedAt(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, date.Add(time.Second*-1), earliest)
 }
 
 func readMongoIDs(t *testing.T, ctx context.Context, collection *mongo.Collection) (ids []primitive.ObjectID) {
