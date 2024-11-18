@@ -57,6 +57,7 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 	)
 
 	// Iterate one day at a time, until we hit the target
+	var total int
 	for date := earliest.Truncate(time.Hour * 24); date.Before(target); date = date.AddDate(0, 0, 1) {
 		slog.Info("archiving", slog.String("date", date.String()))
 
@@ -68,6 +69,7 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 				return fmt.Errorf("failed to delete documents: %w", err)
 			}
 		}
+		total++
 
 		select {
 		case <-ctx.Done():
@@ -75,6 +77,8 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 		case <-time.After(a.delay):
 		}
 	}
+
+	slog.Info("target reached", slog.Int("datesArchived", total))
 
 	return nil
 }
