@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -78,7 +79,7 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 	return nil
 }
 
-func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) error {
+func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) (err error) {
 	fileName := path.Join(
 		date.Format("2006"),
 		date.Format("01"),
@@ -92,12 +93,24 @@ func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		// Close the file writer
+		if cErr := w.Close(); cErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to close file: %w", cErr))
+		}
+	}()
 
 	// Contents will be gzipped
 	gw, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		// Close the gzip writer - note that does not close the underlying file writer
+		if cErr := gw.Close(); cErr != nil {
+			err = errors.Join(fmt.Errorf("failed to close gzip writer: %w", cErr))
+		}
+	}()
 
 	// Iterate each document to be archived
 	var i int
@@ -114,16 +127,6 @@ func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) error {
 	}
 	if err = res.Err(); err != nil {
 		return err
-	}
-
-	// Close the gzip writer - note that does not close the underlying file writer
-	if err = gw.Close(); err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
-	}
-
-	// Finally, close the file writer
-	if err = w.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %w", err)
 	}
 
 	slog.Info("documents written", slog.Int("total", i))
