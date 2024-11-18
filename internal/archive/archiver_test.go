@@ -87,6 +87,28 @@ func TestArchiver(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, day, earliest) // documents have not been deleted, so the date hasn't changed
 	})
+
+	t.Run("with file close error", func(t *testing.T) {
+		t.Parallel()
+
+		doc := `{"id":1}`
+		day := time.Date(2024, time.November, 1, 0, 0, 0, 0, time.UTC)
+
+		src := newMockDocumentSource()
+		src.add(day, doc)
+
+		dest := newMockStorage()
+		dest.forceCloseError = errors.New("force-close-error")
+
+		archiver := archive.NewArchiver(src, dest, false, time.Duration(0))
+		err := archiver.Run(ctx, day.AddDate(0, 0, 1))
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, dest.forceCloseError)
+
+		earliest, err := src.EarliestCreatedAt(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, day, earliest) // document should not have been deleted
+	})
 }
 
 type mockDocumentSource struct {
@@ -151,7 +173,8 @@ func (m *mockStreamingResult) Err() error {
 }
 
 type mockStorage struct {
-	files map[string]*bytes.Buffer
+	files           map[string]*bytes.Buffer
+	forceCloseError error
 }
 
 func newMockStorage() *mockStorage {
@@ -163,7 +186,10 @@ func newMockStorage() *mockStorage {
 func (m *mockStorage) Create(_ context.Context, path string) (io.WriteCloser, error) {
 	buf := bytes.NewBuffer(nil)
 	m.files[path] = buf
-	return &nopCloser{Writer: buf}, nil
+	return &errCloser{
+		Writer: buf,
+		err:    m.forceCloseError,
+	}, nil
 }
 
 func (m *mockStorage) read(path string) ([]string, error) {
@@ -193,10 +219,11 @@ func (m *mockStorage) read(path string) ([]string, error) {
 	return lines, nil
 }
 
-type nopCloser struct {
+type errCloser struct {
 	io.Writer
+	err error
 }
 
-func (*nopCloser) Close() error {
-	return nil
+func (e *errCloser) Close() error {
+	return e.err
 }
