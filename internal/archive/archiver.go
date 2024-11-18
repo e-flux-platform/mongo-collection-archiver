@@ -49,6 +49,12 @@ func (a *Archiver) Run(ctx context.Context, target time.Time) error {
 		return fmt.Errorf("failed to get earliest created at: %w", err)
 	}
 
+	slog.Info(
+		"archiver running",
+		slog.String("target", target.String()),
+		slog.String("earliest", earliest.String()),
+	)
+
 	// Iterate one day at a time, until we hit the target
 	for date := earliest.Truncate(time.Hour * 24); date.Before(target); date = date.AddDate(0, 0, 1) {
 		slog.Info("archiving", slog.String("date", date.String()))

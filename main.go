@@ -90,6 +90,16 @@ func main() {
 }
 
 func run(ctx context.Context, cfg config) error {
+	slog.Info(
+		"received configuration",
+		slog.String("mongoURL", cfg.mongoURL),
+		slog.String("database", cfg.mongoDatabase),
+		slog.String("collection", cfg.mongoCollection),
+		slog.String("storageURL", cfg.storageURL),
+		slog.Duration("retention", cfg.retention),
+		slog.Duration("delay", cfg.delay),
+	)
+
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURL))
 	if err != nil {
 		return fmt.Errorf("unable to connect to mongo: %w", err)
@@ -105,18 +115,7 @@ func run(ctx context.Context, cfg config) error {
 	defer store.Close()
 
 	targetDate := time.Now().UTC().Add(cfg.retention * -1)
-
-	slog.Info(
-		"running",
-		slog.String("mongoURL", cfg.mongoURL),
-		slog.String("database", cfg.mongoDatabase),
-		slog.String("collection", cfg.mongoCollection),
-		slog.String("storageURL", cfg.storageURL),
-		slog.Duration("retention", cfg.retention),
-		slog.Duration("delay", cfg.delay),
-		slog.String("targetDate", targetDate.String()),
-	)
-
 	archiver := archive.NewArchiver(docSource, store, !cfg.delete, cfg.delay)
+
 	return archiver.Run(ctx, targetDate)
 }
