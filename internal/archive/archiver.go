@@ -108,7 +108,7 @@ func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) (err er
 	defer func() {
 		// Close the gzip writer - note that does not close the underlying file writer
 		if cErr := gw.Close(); cErr != nil {
-			err = errors.Join(fmt.Errorf("failed to close gzip writer: %w", cErr))
+			err = errors.Join(err, fmt.Errorf("failed to close gzip writer: %w", cErr))
 		}
 	}()
 
