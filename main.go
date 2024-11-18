@@ -20,13 +20,14 @@ import (
 )
 
 type config struct {
-	storageURL      string
-	mongoURL        string
-	mongoDatabase   string
-	mongoCollection string
-	delete          bool
-	retention       time.Duration
-	delay           time.Duration
+	storageURL            string
+	mongoURL              string
+	mongoDatabase         string
+	mongoCollection       string
+	delete                bool
+	ignoreFileExistsError bool
+	retention             time.Duration
+	delay                 time.Duration
 }
 
 func main() {
@@ -63,6 +64,11 @@ func main() {
 				EnvVars:     []string{"DELETE"},
 				Destination: &cfg.delete,
 			},
+			&cli.BoolFlag{
+				Name:        "ignore-file-exists-error",
+				EnvVars:     []string{"IGNORE_FILE_EXISTS_ERROR"},
+				Destination: &cfg.ignoreFileExistsError,
+			},
 			&cli.DurationFlag{
 				Name:        "retention",
 				EnvVars:     []string{"RETENTION"},
@@ -96,6 +102,8 @@ func run(ctx context.Context, cfg config) error {
 		slog.String("database", cfg.mongoDatabase),
 		slog.String("collection", cfg.mongoCollection),
 		slog.String("storageURL", cfg.storageURL),
+		slog.Bool("delete", cfg.delete),
+		slog.Bool("ignoreFileExistsError", cfg.ignoreFileExistsError),
 		slog.Duration("retention", cfg.retention),
 		slog.Duration("delay", cfg.delay),
 	)
@@ -115,7 +123,7 @@ func run(ctx context.Context, cfg config) error {
 	defer store.Close()
 
 	targetDate := time.Now().UTC().Add(cfg.retention * -1)
-	archiver := archive.NewArchiver(docSource, store, !cfg.delete, cfg.delay)
+	archiver := archive.NewArchiver(docSource, store, !cfg.delete, cfg.ignoreFileExistsError, cfg.delay)
 
 	return archiver.Run(ctx, targetDate)
 }

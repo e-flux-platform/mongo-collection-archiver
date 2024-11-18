@@ -16,10 +16,11 @@ import (
 
 // Archiver deals with archiving documents from a particular source
 type Archiver struct {
-	source     documentSource
-	store      store
-	skipDelete bool
-	delay      time.Duration
+	source                documentSource
+	store                 store
+	skipDelete            bool
+	ignoreFileExistsError bool
+	delay                 time.Duration
 }
 
 type documentSource interface {
@@ -30,15 +31,17 @@ type documentSource interface {
 
 type store interface {
 	Create(ctx context.Context, path string) (io.WriteCloser, error)
+	Exists(ctx context.Context, path string) (bool, error)
 }
 
 // NewArchiver initializes and returns an Archiver
-func NewArchiver(source documentSource, storage store, skipDelete bool, delay time.Duration) *Archiver {
+func NewArchiver(source documentSource, storage store, skipDelete, ignoreFileExistsError bool, delay time.Duration) *Archiver {
 	return &Archiver{
-		source:     source,
-		store:      storage,
-		skipDelete: skipDelete,
-		delay:      delay,
+		source:                source,
+		store:                 storage,
+		skipDelete:            skipDelete,
+		ignoreFileExistsError: ignoreFileExistsError,
+		delay:                 delay,
 	}
 }
 
@@ -99,6 +102,23 @@ func (a *Archiver) archiveDocuments(ctx context.Context, date time.Time) (err er
 		date.Format("01"),
 		date.Format("02")+".json.gz",
 	)
+
+	// Check if target file already exists - the default behaviour of the storage implementations is to overwrite
+	exists, err := a.store.Exists(ctx, fileName)
+	if err != nil {
+		return fmt.Errorf("failed to check if file exists: %w", err)
+	}
+	if exists {
+		slog.Error("target file already exists", slog.String("file", fileName))
+		if a.ignoreFileExistsError {
+			// Archiver can be configured to skip past cases of the target file already existing. This should only be
+			// done if it is safe to assume the file already contains the full set of documents that is expected to be
+			// deleted.
+			slog.Warn("skipping documents write")
+			return nil
+		}
+		return errors.New("target file exists")
+	}
 
 	slog.Info("writing to file", slog.String("fileName", fileName))
 

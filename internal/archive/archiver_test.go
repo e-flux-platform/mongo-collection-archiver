@@ -45,7 +45,7 @@ func TestArchiver(t *testing.T) {
 
 		dest := newMockStorage()
 
-		archiver := archive.NewArchiver(src, dest, false, time.Duration(0))
+		archiver := archive.NewArchiver(src, dest, false, false, time.Duration(0))
 		err := archiver.Run(ctx, day3)
 		require.NoError(t, err)
 		assert.Len(t, dest.files, 2) // 3rd file should not be written, since that is the target
@@ -74,7 +74,7 @@ func TestArchiver(t *testing.T) {
 
 		dest := newMockStorage()
 
-		archiver := archive.NewArchiver(src, dest, true, time.Duration(0))
+		archiver := archive.NewArchiver(src, dest, true, false, time.Duration(0))
 		err := archiver.Run(ctx, day.AddDate(0, 0, 1))
 		require.NoError(t, err)
 		assert.Len(t, dest.files, 1)
@@ -100,7 +100,7 @@ func TestArchiver(t *testing.T) {
 		dest := newMockStorage()
 		dest.forceCloseError = errors.New("force-close-error")
 
-		archiver := archive.NewArchiver(src, dest, false, time.Duration(0))
+		archiver := archive.NewArchiver(src, dest, false, false, time.Duration(0))
 		err := archiver.Run(ctx, day.AddDate(0, 0, 1))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, dest.forceCloseError)
@@ -108,6 +108,43 @@ func TestArchiver(t *testing.T) {
 		earliest, err := src.EarliestCreatedAt(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, day, earliest) // document should not have been deleted
+	})
+
+	t.Run("with file already exists and no ignore", func(t *testing.T) {
+		t.Parallel()
+
+		doc := `{"id":1}`
+		day := time.Date(2024, time.November, 1, 0, 0, 0, 0, time.UTC)
+
+		src := newMockDocumentSource()
+		src.add(day, doc)
+
+		dest := newMockStorage()
+		dest.files["2024/11/01.json.gz"] = bytes.NewBuffer(nil)
+
+		archiver := archive.NewArchiver(src, dest, false, false, time.Duration(0))
+		err := archiver.Run(ctx, day.AddDate(0, 0, 1))
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "file exists")
+	})
+
+	t.Run("with file already exists and ignore", func(t *testing.T) {
+		t.Parallel()
+
+		doc := `{"id":1}`
+		day := time.Date(2024, time.November, 1, 0, 0, 0, 0, time.UTC)
+
+		src := newMockDocumentSource()
+		src.add(day, doc)
+
+		dest := newMockStorage()
+		dest.files["2024/11/01.json.gz"] = bytes.NewBuffer(nil)
+
+		archiver := archive.NewArchiver(src, dest, false, true, time.Duration(0))
+		err := archiver.Run(ctx, day.AddDate(0, 0, 1))
+		assert.NoError(t, err)
+
+		assert.Len(t, src.docs, 0)
 	})
 }
 
@@ -191,6 +228,11 @@ func (m *mockStorage) Create(_ context.Context, path string) (io.WriteCloser, er
 		Writer: buf,
 		err:    m.forceCloseError,
 	}, nil
+}
+
+func (m *mockStorage) Exists(_ context.Context, path string) (bool, error) {
+	_, exists := m.files[path]
+	return exists, nil
 }
 
 func (m *mockStorage) read(path string) ([]string, error) {

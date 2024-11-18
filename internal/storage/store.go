@@ -10,6 +10,7 @@ import (
 
 type Store interface {
 	Create(ctx context.Context, path string) (io.WriteCloser, error)
+	Exists(ctx context.Context, path string) (bool, error)
 	io.Closer
 }
 

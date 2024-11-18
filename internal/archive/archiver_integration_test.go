@@ -67,7 +67,7 @@ func TestArchiver_Integration(t *testing.T) {
 	defer target.Close()
 
 	// Run archiver
-	archiver := archive.NewArchiver(src, target, false, time.Duration(0))
+	archiver := archive.NewArchiver(src, target, false, false, time.Duration(0))
 	err = archiver.Run(ctx, date.Add(time.Hour*24))
 	require.NoError(t, err)
 
