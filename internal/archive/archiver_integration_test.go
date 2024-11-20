@@ -72,7 +72,7 @@ func TestArchiver_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify only doc4 remains
-	ids := readMongoIDs(t, ctx, collection)
+	ids := readMongoIDs(ctx, t, collection)
 	require.Len(t, ids, 1)
 	assert.Equal(t, "5d6fdf85451f58001939950a", ids[0].Hex()) // doc4
 
@@ -87,7 +87,7 @@ func TestArchiver_Integration(t *testing.T) {
 	// Verify we can restore doc1, doc2, and doc3
 	_, err = collection.InsertMany(ctx, []any{archived1[0], archived2[0], archived2[1]})
 	require.NoError(t, err)
-	ids = readMongoIDs(t, ctx, collection)
+	ids = readMongoIDs(ctx, t, collection)
 	require.Len(t, ids, 4)
 
 	// Verify earliest is resolved to the createdAt time of doc1
@@ -96,7 +96,7 @@ func TestArchiver_Integration(t *testing.T) {
 	assert.Equal(t, date.Add(time.Second*-1), earliest)
 }
 
-func readMongoIDs(t *testing.T, ctx context.Context, collection *mongo.Collection) (ids []primitive.ObjectID) {
+func readMongoIDs(ctx context.Context, t *testing.T, collection *mongo.Collection) (ids []primitive.ObjectID) {
 	t.Helper()
 
 	cursor, err := collection.Find(ctx, bson.M{})
